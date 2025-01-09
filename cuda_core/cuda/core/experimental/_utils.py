@@ -4,7 +4,7 @@
 
 import functools
 from collections import namedtuple
-from typing import Callable, Dict
+from typing import Any, Callable, Dict, Optional, Tuple
 
 from cuda import cuda, cudart, nvrtc
 
@@ -55,8 +55,11 @@ def _check_error(error, handle=None):
         raise RuntimeError(f"Unknown error type: {error}")
 
 
-def handle_return(result, handle=None):
-    _check_error(result[0], handle=handle)
+def handle_return(result, handle=None, custom_handler: Callable[[Tuple[Any, ...], Optional[Any]], bool] = None):
+    if custom_handler:
+        handled = custom_handler(result, handle)
+    if not handled:
+        _check_error(result[0], handle=handle)
     if len(result) == 1:
         return
     elif len(result) == 2:
