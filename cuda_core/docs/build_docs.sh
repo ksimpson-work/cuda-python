@@ -19,12 +19,12 @@ if [[ -z "${SPHINX_CUDA_CORE_VER}" ]]; then
 fi
 
 # build the docs (in parallel)
-SPHINXOPTS="-j 4" make html
+#SPHINXOPTS="-j 4" make html
 
 # for debugging/developing (conf.py), please comment out the above line and
 # use the line below instead, as we must build in serial to avoid getting
 # obsecure Sphinx errors
-#SPHINXOPTS="-v" make html
+SPHINXOPTS="-v" make html
 
 # to support version dropdown menu
 cp ./versions.json build/html
