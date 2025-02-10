@@ -14,7 +14,7 @@ except ImportError:
 import ctypes
 
 from cuda.core.experimental import Device
-from cuda.core.experimental._memory import Buffer, MemoryResource
+from cuda.core.experimental._memory import Buffer, MemoryResource, ShareableMempool, SharedMempool
 from cuda.core.experimental._utils import handle_return
 
 
@@ -211,3 +211,26 @@ def test_buffer_close():
     buffer_close(DummyHostMemoryResource())
     buffer_close(DummyUnifiedMemoryResource(device))
     buffer_close(DummyPinnedMemoryResource(device))
+
+
+def test_shareable_memory_resource():
+    device = Device()
+    device.set_current()
+    mr = ShareableMempool(device, 1024)
+    buffer = mr.allocate(64)
+    shareable_handle = mr.get_shareable_handle()
+
+    # create a new process and import the shareable handle
+    import os
+
+    pid = os.fork()
+    if pid == 0:
+        # child process
+        mr = SharedMempool(device, shared_handle=shareable_handle)
+        buffer = mr.allocate(64)
+        buffer.close()
+        os._exit(0)
+    else:
+        os.waitpid(pid, 0)
+
+    print("done")

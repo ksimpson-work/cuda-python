@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import abc
+import platform
 import weakref
 from typing import Optional, Tuple, TypeVar
 
@@ -236,6 +237,94 @@ class MemoryResource(abc.ABC):
         # Return the device ID if this MR is for single devices. Raise an
         # exception if it is not.
         ...
+
+
+class SharedMempool(MemoryResource):
+    __slots__ = ("_dev_id", "_handle")
+
+    def __init__(self, dev_id, shared_handle):
+        self._dev_id = dev_id
+        self._handle = handle_return(driver.cuMemPoolImportFromShareableHandle(shared_handle))
+
+    def allocate(self, size, stream=None) -> Buffer:
+        if stream is None:
+            stream = default_stream()
+        ptr = handle_return(driver.cuMemAllocFromPoolAsync(size, self._handle, stream.handle))
+        return Buffer(ptr, size, self)
+
+    def deallocate(self, ptr, size, stream=None):
+        if stream is None:
+            stream = default_stream()
+        handle_return(driver.cuMemFreeAsync(ptr, stream.handle))
+
+    @property
+    def is_device_accessible(self) -> bool:
+        return True
+
+    @property
+    def is_host_accessible(self) -> bool:
+        return False
+
+    @property
+    def device_id(self) -> int:
+        return self._dev_id
+
+
+class ShareableMempool(MemoryResource):
+    __slots__ = ("_dev_id", "_handle")
+
+    def __init__(self, dev_id, max_size: int):
+        self._dev_id = dev_id
+        properties = driver.CUmemPoolProps()
+        properties.allocType = driver.CUmemAllocationType.CU_MEM_ALLOCATION_TYPE_PINNED
+        if platform.system() == "Linux":
+            properties.handleTypes = driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR
+        elif platform.system() == "Windows":
+            properties.handleTypes = driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_WIN32
+        properties.location = driver.CUmemLocation()
+        properties.location.id = dev_id
+        properties.location.type = driver.CUmemLocationType.CU_MEM_LOCATION_TYPE_DEVICE
+        properties.maxSize = max_size
+
+        self._handle = handle_return(driver.cuMemPoolCreate(properties))
+
+    def allocate(self, size, stream=None) -> Buffer:
+        if stream is None:
+            stream = default_stream()
+            # CUdeviceptr* dptr, size_t bytesize, CUmemoryPool pool, CUstream hStream
+        ptr = handle_return(driver.cuMemAllocFromPoolAsync(size, self._handle, stream.handle))
+        return Buffer(ptr, size, self)
+
+    def deallocate(self, ptr, size, stream=None):
+        if stream is None:
+            stream = default_stream()
+        handle_return(driver.cuMemFreeAsync(ptr, stream.handle))
+
+    def get_shareable_handle(self):
+        if platform.system() == "Linux":
+            return handle_return(
+                driver.cuMemPoolExportToShareableHandle(
+                    self._handle, driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR, 0
+                )
+            )
+        elif platform.system() == "Windows":
+            return handle_return(
+                driver.cuMemPoolExportToShareableHandle(
+                    self._handle, driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_WIN32, 0
+                )
+            )
+
+    @property
+    def is_device_accessible(self) -> bool:
+        return True
+
+    @property
+    def is_host_accessible(self) -> bool:
+        return False
+
+    @property
+    def device_id(self) -> int:
+        return self._dev_id
 
 
 class _DefaultAsyncMempool(MemoryResource):
