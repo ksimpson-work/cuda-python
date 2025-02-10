@@ -228,7 +228,7 @@ def test_shareable_memory_resource():
         # child process
         # device = Device()
         # device.set_current()
-        Device().set_current()
+        Device(0).set_current()
         mr = SharedMempool(device, shared_handle=shareable_handle)
         buffer = mr.allocate(64)
         buffer.close()
