@@ -244,7 +244,11 @@ class SharedMempool(MemoryResource):
 
     def __init__(self, dev_id, shared_handle):
         self._dev_id = dev_id
-        self._handle = handle_return(driver.cuMemPoolImportFromShareableHandle(shared_handle))
+        if platform.system() == "Linux":
+            handle_type = driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR
+        elif platform.system() == "Windows":
+            handle_type = driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_WIN32
+        self._handle = handle_return(driver.cuMemPoolImportFromShareableHandle(shared_handle, handle_type, 0))
 
     def allocate(self, size, stream=None) -> Buffer:
         if stream is None:
