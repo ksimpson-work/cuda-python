@@ -226,8 +226,8 @@ def test_shareable_memory_resource():
     pid = os.fork()
     if pid == 0:
         # child process
-        device = Device()
-        device.set_current()
+        # device = Device()
+        # device.set_current()
         mr = SharedMempool(device, shared_handle=shareable_handle)
         buffer = mr.allocate(64)
         buffer.close()
