@@ -218,6 +218,7 @@ def child_process(shared_handle):
     device = Device()
     device.set_current()
     mr = SharedMempool(device, shared_handle=shared_handle)
+    print("created share resource")
     buffer = mr.allocate(64)
     print("allocated on the IPC handle")
     buffer.close()
