@@ -243,6 +243,7 @@ class SharedMempool(MemoryResource):
     __slots__ = ("_dev_id", "_handle")
 
     def __init__(self, dev_id, shared_handle):
+        print("creatingi    SharedMempool")
         self._dev_id = dev_id
         if platform.system() == "Linux":
             handle_type = driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR
