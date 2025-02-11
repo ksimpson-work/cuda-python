@@ -213,27 +213,32 @@ def test_buffer_close():
     buffer_close(DummyPinnedMemoryResource(device))
 
 
+def child_process(shared_handle):
+    print("inside other process about to init")
+    device = Device()
+    device.set_current()
+    mr = SharedMempool(device, shared_handle=shared_handle)
+    buffer = mr.allocate(64)
+    print("allocated on the IPC handle")
+    buffer.close()
+
+
 def test_shareable_memory_resource():
+    import multiprocessing
+
     device = Device()
     device.set_current()
     mr = ShareableMempool(device, 1024)
     buffer = mr.allocate(64)
+    buffer.close()
     shareable_handle = mr.get_shareable_handle()
 
     # create a new process and import the shareable handle
-    import os
 
-    pid = os.fork()
-    if pid == 0:
-        # child process
-        # device = Device()
-        # device.set_current()
-        Device(0).set_current()
-        mr = SharedMempool(device, shared_handle=shareable_handle)
-        buffer = mr.allocate(64)
-        buffer.close()
-        os._exit(0)
-    else:
-        os.waitpid(pid, 0)
+    multiprocessing.set_start_method("spawn")
+
+    process = multiprocessing.Process(target=child_process, args=(shareable_handle,))
+    process.start()
+    process.join()
 
     print("done")
