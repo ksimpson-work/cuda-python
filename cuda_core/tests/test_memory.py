@@ -214,9 +214,11 @@ def test_buffer_close():
 
 
 def child_process(shared_handle):
-    print("inside other process about to init")
+    print("inside other process about to init__")
     device = Device()
+    print("set current device")
     device.set_current()
+    print("created device")
     mr = SharedMempool(device, shared_handle=shared_handle)
     print("created share resource")
     buffer = mr.allocate(64)
