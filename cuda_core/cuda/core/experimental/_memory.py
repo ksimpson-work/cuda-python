@@ -249,6 +249,7 @@ class SharedMempool(MemoryResource):
             handle_type = driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR
         elif platform.system() == "Windows":
             handle_type = driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_WIN32
+        print("SharedMempool call")
         self._handle = handle_return(driver.cuMemPoolImportFromShareableHandle(shared_handle, handle_type, 0))
         print("SharedMempool: ", self._handle)
 
