@@ -222,14 +222,12 @@ def child_process(shared_handle, queue):
         device.set_current()
 
         # Import the shared memory pool
-        print("creating shared memory pool")
+        print("creating a shared memory pool from a handle")
         mr = SharedMempool(device.device_id, shared_handle=shared_handle)
-        print("created shared memory pool")
+        print("created a shared memory pool from a handle")
 
         # Allocate and write to buffer
-        print("allocating buffer")
         buffer = mr.allocate(1024)
-        print("allocated buffer")
         ptr = ctypes.cast(buffer.handle, ctypes.POINTER(ctypes.c_byte))
         for i in range(1024):
             ptr[i] = ctypes.c_byte(i % 256)

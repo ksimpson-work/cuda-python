@@ -284,7 +284,7 @@ class SharedMempool(MemoryResource):
             properties.maxSize = max_size
 
             self._handle = handle_return(driver.cuMemPoolCreate(properties))
-            print("created shared memory pool")
+            print("created a new shared memory pool")
 
     def _get_platform_handle_type(self) -> int:
         """Returns the appropriate handle type for the current platform."""
