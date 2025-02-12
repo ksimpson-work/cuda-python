@@ -222,7 +222,7 @@ def child_process(shared_handle, queue):
         device.set_current()
 
         # Import the shared memory pool
-        mr = SharedMempool(device.id, shared_handle=shared_handle)
+        mr = SharedMempool(device.device_id, shared_handle=shared_handle)
 
         # Allocate and write to buffer
         buffer = mr.allocate(1024)
@@ -278,7 +278,7 @@ def test_shared_memory_resource():
 
     # Create shared memory pool
     pool_size = 1024 * 1024  # 1MB
-    mr = SharedMempool(device.id, max_size=pool_size)
+    mr = SharedMempool(device.device_id, max_size=pool_size)
 
     # Test basic allocation
     buffer = mr.allocate(1024)
@@ -302,7 +302,7 @@ def test_shared_memory_resource():
     process.start()
 
     # Run parent process logic
-    parent_process(device.id, shareable_handle, queue)
+    parent_process(device.device_id, shareable_handle, queue)
 
     # Wait for child process to complete
     process.join(timeout=10)
