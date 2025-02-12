@@ -239,73 +239,70 @@ class MemoryResource(abc.ABC):
         ...
 
 
-class ShareableMempool(MemoryResource):
-    __slots__ = ("_dev_id", "_handle")
-
-    def __init__(self, dev_id, max_size: int):
-        self._dev_id = dev_id
-        properties = driver.CUmemPoolProps()
-        properties.allocType = driver.CUmemAllocationType.CU_MEM_ALLOCATION_TYPE_PINNED
-        if platform.system() == "Linux":
-            properties.handleTypes = driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR
-        elif platform.system() == "Windows":
-            properties.handleTypes = driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_WIN32
-        properties.location = driver.CUmemLocation()
-        properties.location.id = dev_id
-        properties.location.type = driver.CUmemLocationType.CU_MEM_LOCATION_TYPE_DEVICE
-        properties.maxSize = max_size
-
-        self._handle = handle_return(driver.cuMemPoolCreate(properties))
-
-    def allocate(self, size, stream=None) -> Buffer:
-        if stream is None:
-            stream = default_stream()
-            # CUdeviceptr* dptr, size_t bytesize, CUmemoryPool pool, CUstream hStream
-        ptr = handle_return(driver.cuMemAllocFromPoolAsync(size, self._handle, stream.handle))
-        return Buffer(ptr, size, self)
-
-    def deallocate(self, ptr, size, stream=None):
-        if stream is None:
-            stream = default_stream()
-        handle_return(driver.cuMemFreeAsync(ptr, stream.handle))
-
-    def get_shareable_handle(self):
-        if platform.system() == "Linux":
-            return handle_return(
-                driver.cuMemPoolExportToShareableHandle(
-                    self._handle, driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR, 0
-                )
-            )
-        elif platform.system() == "Windows":
-            return handle_return(
-                driver.cuMemPoolExportToShareableHandle(
-                    self._handle, driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_WIN32, 0
-                )
-            )
-
-    @property
-    def is_device_accessible(self) -> bool:
-        return True
-
-    @property
-    def is_host_accessible(self) -> bool:
-        return False
-
-    @property
-    def device_id(self) -> int:
-        return self._dev_id
-
-
 class SharedMempool(MemoryResource):
+    """A memory pool that can be shared between processes on the same device.
+
+    This class creates a CUDA memory pool that can be exported and imported
+    across process boundaries, enabling efficient memory sharing between processes.
+
+    Parameters
+    ----------
+    dev_id : int
+        The ID of the GPU device where the memory pool will be created
+    max_size : int, optional
+        Maximum size in bytes that the memory pool can grow to. Only used when creating
+        a new pool (not when importing)
+    shared_handle : int, optional
+        A platform-specific handle to import an existing memory pool. If provided,
+        max_size is ignored and the pool is imported instead of created
+    """
+
     __slots__ = ("_dev_id", "_handle")
 
-    def __init__(self, dev_id, shared_handle):
+    def __init__(self, dev_id: int, max_size: Optional[int] = None, shared_handle: Optional[int] = None) -> None:
         self._dev_id = dev_id
-        if platform.system() == "Linux":
-            handle_type = driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR
-        elif platform.system() == "Windows":
-            handle_type = driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_WIN32
-        self._handle = handle_return(driver.cuMemPoolImportFromShareableHandle(shared_handle, handle_type, 0))
+
+        if shared_handle is not None:
+            # Import existing pool
+            self._handle = handle_return(
+                driver.cuMemPoolImportFromShareableHandle(shared_handle, self._get_platform_handle_type(), 0)
+            )
+        else:
+            # Create new pool
+            if max_size is None:
+                raise ValueError("max_size must be provided when creating a new memory pool")
+
+            properties = driver.CUmemPoolProps()
+            properties.allocType = driver.CUmemAllocationType.CU_MEM_ALLOCATION_TYPE_PINNED
+            properties.handleTypes = self._get_platform_handle_type()
+
+            properties.location = driver.CUmemLocation()
+            properties.location.id = dev_id
+            properties.location.type = driver.CUmemLocationType.CU_MEM_LOCATION_TYPE_DEVICE
+            properties.maxSize = max_size
+
+            self._handle = handle_return(driver.cuMemPoolCreate(properties))
+
+    def _get_platform_handle_type(self) -> int:
+        """Returns the appropriate handle type for the current platform."""
+        system = platform.system()
+        if system == "Linux":
+            return driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR
+        elif system == "Windows":
+            return driver.CUmemAllocationHandleType.CU_MEM_HANDLE_TYPE_WIN32
+        else:
+            raise RuntimeError(f"Unsupported platform: {system}")
+
+    def get_shareable_handle(self) -> int:
+        """Get a platform-specific handle that can be shared with other processes.
+
+        Returns
+        -------
+        int
+            A shareable handle that can be used to import this memory pool
+            in another process
+        """
+        return handle_return(driver.cuMemPoolExportToShareableHandle(self._handle, self._get_platform_handle_type(), 0))
 
     def allocate(self, size, stream=None) -> Buffer:
         if stream is None:
@@ -320,14 +317,17 @@ class SharedMempool(MemoryResource):
 
     @property
     def is_device_accessible(self) -> bool:
+        """Whether memory from this pool is accessible from device code."""
         return True
 
     @property
     def is_host_accessible(self) -> bool:
+        """Whether memory from this pool is accessible from host code."""
         return False
 
     @property
     def device_id(self) -> int:
+        """The ID of the GPU device this memory pool is associated with."""
         return self._dev_id
 
 
