@@ -264,9 +264,11 @@ class SharedMempool(MemoryResource):
 
         if shared_handle is not None:
             # Import existing pool
+            print("importing shared memory pool")
             self._handle = handle_return(
                 driver.cuMemPoolImportFromShareableHandle(shared_handle, self._get_platform_handle_type(), 0)
             )
+            print("imported shared memory pool")
         else:
             # Create new pool
             if max_size is None:
@@ -282,6 +284,7 @@ class SharedMempool(MemoryResource):
             properties.maxSize = max_size
 
             self._handle = handle_return(driver.cuMemPoolCreate(properties))
+            print("created shared memory pool")
 
     def _get_platform_handle_type(self) -> int:
         """Returns the appropriate handle type for the current platform."""
