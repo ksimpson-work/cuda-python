@@ -213,57 +213,64 @@ def test_buffer_close():
     buffer_close(DummyPinnedMemoryResource(device))
 
 
+def child_process(shared_handle, queue):
+    """Child process function that writes data to shared memory."""
+    try:
+        from cuda.core.experimental import Device
+
+        device = Device()
+        device.set_current()
+
+        # Import the shared memory pool
+        mr = SharedMempool(device.id, shared_handle=shared_handle)
+
+        # Allocate and write to buffer
+        buffer = mr.allocate(1024)
+        ptr = ctypes.cast(buffer.handle, ctypes.POINTER(ctypes.c_byte))
+        for i in range(1024):
+            ptr[i] = ctypes.c_byte(i % 256)
+
+        # Signal parent process that data is ready
+        queue.put("Data written")
+
+        # Wait for parent to read
+        assert queue.get() == "Data read"
+
+        buffer.close()
+
+    except Exception as e:
+        queue.put(e)
+        raise
+
+
+def parent_process(device_id, shared_handle, queue):
+    """Parent process function that reads and verifies data from shared memory."""
+    try:
+        # Import the shared memory pool
+        mr = SharedMempool(device_id, shared_handle=shared_handle)
+
+        # Wait for child to write data
+        assert queue.get() == "Data written"
+
+        # Read and verify data
+        buffer = mr.allocate(1024)
+        ptr = ctypes.cast(buffer.handle, ctypes.POINTER(ctypes.c_byte))
+        for i in range(1024):
+            assert ptr[i] == ctypes.c_byte(i % 256), f"Mismatch at index {i}"
+
+        # Signal child that we've read the data
+        queue.put("Data read")
+
+        buffer.close()
+
+    except Exception as e:
+        queue.put(e)
+        raise
+
+
 def test_shared_memory_resource():
+    """Test shared memory pool functionality across processes."""
     import multiprocessing
-
-    def child_process(shared_handle, queue):
-        try:
-            device = Device()
-            device.set_current()
-
-            # Import the shared memory pool
-            mr = SharedMempool(device.device_id, shared_handle=shared_handle)
-
-            # Allocate and write to buffer
-            buffer = mr.allocate(1024)
-            ptr = ctypes.cast(buffer.handle, ctypes.POINTER(ctypes.c_byte))
-            for i in range(1024):
-                ptr[i] = ctypes.c_byte(i % 256)
-
-            # Signal parent process that data is ready
-            queue.put("Data written")
-
-            # Wait for parent to read
-            assert queue.get() == "Data read"
-
-            buffer.close()
-
-        except Exception as e:
-            queue.put(e)
-            raise
-
-    def parent_process(shared_handle, queue):
-        try:
-            # Import the shared memory pool
-            mr = SharedMempool(device.device_id, shared_handle=shared_handle)
-
-            # Wait for child to write data
-            assert queue.get() == "Data written"
-
-            # Read and verify data
-            buffer = mr.allocate(1024)
-            ptr = ctypes.cast(buffer.handle, ctypes.POINTER(ctypes.c_byte))
-            for i in range(1024):
-                assert ptr[i] == ctypes.c_byte(i % 256), f"Mismatch at index {i}"
-
-            # Signal child that we've read the data
-            queue.put("Data read")
-
-            buffer.close()
-
-        except Exception as e:
-            queue.put(e)
-            raise
 
     # Initialize device
     device = Device()
@@ -271,7 +278,7 @@ def test_shared_memory_resource():
 
     # Create shared memory pool
     pool_size = 1024 * 1024  # 1MB
-    mr = SharedMempool(device.device_id, max_size=pool_size)
+    mr = SharedMempool(device.id, max_size=pool_size)
 
     # Test basic allocation
     buffer = mr.allocate(1024)
@@ -295,7 +302,7 @@ def test_shared_memory_resource():
     process.start()
 
     # Run parent process logic
-    parent_process(shareable_handle, queue)
+    parent_process(device.id, shareable_handle, queue)
 
     # Wait for child process to complete
     process.join(timeout=10)
