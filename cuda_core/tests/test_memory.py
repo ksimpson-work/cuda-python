@@ -222,10 +222,14 @@ def child_process(shared_handle, queue):
         device.set_current()
 
         # Import the shared memory pool
+        print("creating shared memory pool")
         mr = SharedMempool(device.device_id, shared_handle=shared_handle)
+        print("created shared memory pool")
 
         # Allocate and write to buffer
+        print("allocating buffer")
         buffer = mr.allocate(1024)
+        print("allocated buffer")
         ptr = ctypes.cast(buffer.handle, ctypes.POINTER(ctypes.c_byte))
         for i in range(1024):
             ptr[i] = ctypes.c_byte(i % 256)
@@ -291,6 +295,7 @@ def test_shared_memory_resource():
 
     # Get shareable handle
     shareable_handle = mr.get_shareable_handle()
+    print("shareable handle: ", shareable_handle)
     assert shareable_handle != 0
 
     # Test cross-process sharing
