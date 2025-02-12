@@ -248,10 +248,6 @@ def child_process(shared_handle, queue):
 def parent_process(device_id, shared_handle, queue):
     """Parent process function that reads and verifies data from shared memory."""
     try:
-        from cuda.core.experimental import Device
-
-        device = Device()
-        device.set_current()
         # Import the shared memory pool
         mr = SharedMempool(device_id, shared_handle=shared_handle)
 
@@ -308,12 +304,14 @@ def test_shared_memory_resource():
     process = multiprocessing.Process(target=child_process, args=(shareable_handle, queue))
     process.start()
 
-    # Run parent process logic
-    parent_process(device.device_id, shareable_handle, queue)
-
     # Wait for child process to complete
     process.join(timeout=10)
     assert process.exitcode == 0, "Child process failed"
+    print("child process done")
+
+    # Run parent process logic
+    print("creating a shared mempool for a sharable handle within the same parent proc")
+    parent_process(device.device_id, shareable_handle, queue)
 
     # Check for any exceptions from the child process
     if not queue.empty():
