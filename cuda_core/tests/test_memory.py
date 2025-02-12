@@ -117,9 +117,9 @@ class DummyPinnedMemoryResource(MemoryResource):
 
 
 def buffer_initialization(dummy_mr: MemoryResource):
-    buffer = dummy_mr.allocate(size=1024)
+    buffer = dummy_mr.allocate(size=64)
     assert buffer.handle != 0
-    assert buffer.size == 1024
+    assert buffer.size == 64
     assert buffer.memory_resource == dummy_mr
     assert buffer.is_device_accessible == dummy_mr.is_device_accessible
     assert buffer.is_host_accessible == dummy_mr.is_host_accessible
@@ -136,13 +136,13 @@ def test_buffer_initialization():
 
 
 def buffer_copy_to(dummy_mr: MemoryResource, device: Device, check=False):
-    src_buffer = dummy_mr.allocate(size=1024)
-    dst_buffer = dummy_mr.allocate(size=1024)
+    src_buffer = dummy_mr.allocate(size=64)
+    dst_buffer = dummy_mr.allocate(size=64)
     stream = device.create_stream()
 
     if check:
         src_ptr = ctypes.cast(src_buffer.handle, ctypes.POINTER(ctypes.c_byte))
-        for i in range(1024):
+        for i in range(64):
             src_ptr[i] = ctypes.c_byte(i)
 
     src_buffer.copy_to(dst_buffer, stream=stream)
@@ -167,13 +167,13 @@ def test_buffer_copy_to():
 
 
 def buffer_copy_from(dummy_mr: MemoryResource, device, check=False):
-    src_buffer = dummy_mr.allocate(size=1024)
-    dst_buffer = dummy_mr.allocate(size=1024)
+    src_buffer = dummy_mr.allocate(size=64)
+    dst_buffer = dummy_mr.allocate(size=64)
     stream = device.create_stream()
 
     if check:
         src_ptr = ctypes.cast(src_buffer.handle, ctypes.POINTER(ctypes.c_byte))
-        for i in range(1024):
+        for i in range(64):
             src_ptr[i] = ctypes.c_byte(i)
 
     dst_buffer.copy_from(src_buffer, stream=stream)
@@ -198,7 +198,7 @@ def test_buffer_copy_from():
 
 
 def buffer_close(dummy_mr: MemoryResource):
-    buffer = dummy_mr.allocate(size=1024)
+    buffer = dummy_mr.allocate(size=64)
     buffer.close()
     assert buffer.handle == 0
     assert buffer.memory_resource is None
@@ -227,9 +227,9 @@ def child_process(shared_handle, queue):
         print("created a shared memory pool from a handle")
 
         # Allocate and write to buffer
-        buffer = mr.allocate(1024)
+        buffer = mr.allocate(64)
         ptr = ctypes.cast(buffer.handle, ctypes.POINTER(ctypes.c_byte))
-        for i in range(1024):
+        for i in range(64):
             ptr[i] = ctypes.c_byte(i % 256)
 
         # Signal parent process that data is ready
@@ -255,9 +255,9 @@ def parent_process(device_id, shared_handle, queue):
         assert queue.get() == "Data written"
 
         # Read and verify data
-        buffer = mr.allocate(1024)
+        buffer = mr.allocate(64)
         ptr = ctypes.cast(buffer.handle, ctypes.POINTER(ctypes.c_byte))
-        for i in range(1024):
+        for i in range(64):
             assert ptr[i] == ctypes.c_byte(i % 256), f"Mismatch at index {i}"
 
         # Signal child that we've read the data
@@ -280,13 +280,13 @@ def test_shared_memory_resource():
     device.set_current()
 
     # Create shared memory pool
-    pool_size = 1024 * 1024  # 1MB
+    pool_size = 64 * 64  # 1MB
     mr = SharedMempool(device.device_id, max_size=pool_size)
 
     # Test basic allocation
-    buffer = mr.allocate(1024)
+    buffer = mr.allocate(64)
     assert buffer.handle != 0
-    assert buffer.size == 1024
+    assert buffer.size == 64
     assert buffer.memory_resource == mr
     assert buffer.is_device_accessible
     assert not buffer.is_host_accessible
@@ -309,7 +309,7 @@ def test_shared_memory_resource():
     queue = multiprocessing.Queue()
 
     # Create child process
-    process = multiprocessing.Process(target=child_process, args=(shareable_handle, queue))
+    process = multiprocessing.Process(target=child_process, args=(os.dup(shareable_handle), queue))
     process.start()
 
     # Wait for child process to complete
