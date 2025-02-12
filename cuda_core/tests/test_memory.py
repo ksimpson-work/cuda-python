@@ -250,6 +250,10 @@ def child_process(shared_handle, queue):
 def parent_process(device_id, shared_handle, queue):
     """Parent process function that reads and verifies data from shared memory."""
     try:
+        from cuda.core.experimental import Device
+
+        device = Device()
+        device.set_current()
         # Import the shared memory pool
         mr = SharedMempool(device_id, shared_handle=shared_handle)
 
