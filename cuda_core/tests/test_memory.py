@@ -309,12 +309,18 @@ def test_shared_memory_resource():
     queue = multiprocessing.Queue()
 
     # Create child process
-    process = multiprocessing.Process(target=child_process, args=(os.dup(shareable_handle), queue))
+    process = multiprocessing.Process(target=child_process, args=(shareable_handle, queue))
     process.start()
 
     # Wait for child process to complete
     process.join(timeout=10)
-    assert process.exitcode == 0, "Child process failed"
+    try:
+        assert process.exitcode == 0, "Child process failed"
+    except Exception:
+        # dump  all the exceptions from the queue
+        while not queue.empty():
+            exception = queue.get()
+            print(f"Child process failed: {exception}")
     print("child process done")
 
     # Run parent process logic

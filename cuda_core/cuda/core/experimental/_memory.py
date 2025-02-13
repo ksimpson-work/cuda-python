@@ -263,14 +263,10 @@ class SharedMempool(MemoryResource):
         self._dev_id = dev_id
 
         if shared_handle is not None:
-            import ctypes
-
             # Import existing pool
             print("importing shared memory pool")
-            handle_value = ctypes.c_int(shared_handle)
-            handle_ptr = ctypes.pointer(handle_value)
             self._handle = handle_return(
-                driver.cuMemPoolImportFromShareableHandle(handle_ptr, self._get_platform_handle_type(), 0)
+                driver.cuMemPoolImportFromShareableHandle(shared_handle, self._get_platform_handle_type(), 0)
             )
             print("imported shared memory pool")
         else:
