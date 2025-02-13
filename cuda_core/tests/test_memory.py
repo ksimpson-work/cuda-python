@@ -264,12 +264,11 @@ def parent_process(device_id, shared_handle, queue):
 
         # Signal child that we've read the data
         queue.put("Data read")
-        queue.task_done()
+
         buffer.close()
 
     except Exception as e:
         queue.put(e)
-        queue.task_done()
         raise
 
 
@@ -315,14 +314,7 @@ def test_shared_memory_resource():
 
     # Wait for child process to complete
     process.join(timeout=10)
-    print("child process done")
-    try:
-        assert process.exitcode == 0, "Child process failed"
-    except Exception:
-        # dump  all the exceptions from the queue
-        while not queue.empty():
-            exception = queue.get()
-            print(f"Child process failed: {exception}")
+    assert process.exitcode == 0, "Child process failed"
     print("child process done")
 
     # Run parent process logic
