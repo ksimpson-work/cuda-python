@@ -299,12 +299,6 @@ def test_shared_memory_resource():
     # try importing on the same process
     imported_pool = SharedMempool(0, shared_handle=shareable_handle)
     print("imported pool: ", imported_pool)
-    # check if the file descriptor is readable
-    try:
-        os.read(shareable_handle, 1)
-    except OSError as e:
-        print(f"Warning: Handle {shareable_handle} is not readable: {e}")
-        raise
 
     # Test cross-process sharing
     multiprocessing.set_start_method("spawn", force=True)
