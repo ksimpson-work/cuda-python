@@ -265,13 +265,8 @@ class SharedMempool(MemoryResource):
         if shared_handle is not None:
             # Import existing pool
             print("importing shared memory pool")
-            # get the address of the shared_handle
-            import ctypes
-
             self._handle = handle_return(
-                driver.cuMemPoolImportFromShareableHandle(
-                    ctypes.cast(shared_handle, ctypes.c_void_p), self._get_platform_handle_type(), 0
-                )
+                driver.cuMemPoolImportFromShareableHandle(shared_handle, self._get_platform_handle_type(), 0)
             )
             print("imported shared memory pool")
         else:
