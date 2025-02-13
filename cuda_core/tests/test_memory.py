@@ -12,6 +12,8 @@ except ImportError:
     from cuda import cuda as driver
 
 import ctypes
+import multiprocessing
+import os
 
 from cuda.core.experimental import Device
 from cuda.core.experimental._memory import Buffer, MemoryResource, SharedMempool
@@ -272,8 +274,6 @@ def parent_process(device_id, shared_handle, queue):
 
 def test_shared_memory_resource():
     """Test shared memory pool functionality across processes."""
-    import multiprocessing
-    import os
 
     # Initialize device
     device = Device()
@@ -326,3 +326,59 @@ def test_shared_memory_resource():
         exception = queue.get()
         if isinstance(exception, Exception):
             raise exception
+
+
+def pointer_child_process(handle, export_data, queue):
+    try:
+        # Import the pool
+        imported_pool = SharedMempool(0, shared_handle=handle)
+
+        # Import the pointer
+        imported_ptr = imported_pool.import_pointer(export_data)
+
+        # Verify pointer is valid
+        assert imported_ptr != 0
+
+        queue.put(None)  # Signal success
+    except Exception as e:
+        queue.put(e)
+
+
+def test_shared_memory_pointer():
+    # Get device
+    device = Device(0)
+
+    # Create shared memory pool
+    pool_size = 64 * 64
+    mr = SharedMempool(device.device_id, max_size=pool_size)
+
+    # Allocate memory and get pointer
+    buffer = mr.allocate(64)
+    ptr = buffer.handle
+
+    # Export pointer data
+    export_data = mr.export_pointer(ptr)
+
+    # Get shareable handle for pool
+    shareable_handle = mr.get_shareable_handle()
+
+    # Test cross-process pointer sharing
+    multiprocessing.set_start_method("spawn", force=True)
+    queue = multiprocessing.Queue()
+
+    # Create child process
+    process = multiprocessing.Process(target=pointer_child_process, args=(os.dup(shareable_handle), export_data, queue))
+    process.start()
+
+    # Wait for child process to complete
+    process.join(timeout=10)
+    assert process.exitcode == 0, "Child process failed"
+
+    # Check for any exceptions from the child process
+    if not queue.empty():
+        exception = queue.get()
+        if isinstance(exception, Exception):
+            raise exception
+
+    # Cleanup
+    buffer.close()
