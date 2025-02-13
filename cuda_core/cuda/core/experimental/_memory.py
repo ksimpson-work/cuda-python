@@ -282,6 +282,8 @@ class SharedMempool(MemoryResource):
             properties.location.id = dev_id
             properties.location.type = driver.CUmemLocationType.CU_MEM_LOCATION_TYPE_DEVICE
             properties.maxSize = max_size
+            properties.win32SecurityAttributes = 0
+            properties.usage = 0
 
             self._handle = handle_return(driver.cuMemPoolCreate(properties))
             print("created a new shared memory pool")

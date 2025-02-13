@@ -226,7 +226,6 @@ def child_process(shared_handle, queue):
         # Import the shared memory pool
         print("creating a shared memory pool from a handle")
         mr = SharedMempool(device.device_id, shared_handle=shared_handle)
-        print("created a shared memory pool from a handle")
 
         # Allocate and write to buffer
         buffer = mr.allocate(64)
@@ -272,48 +271,6 @@ def parent_process(device_id, shared_handle, queue):
         raise
 
 
-def check_file_descriptor(fd):
-    import fcntl
-    import os
-    import select
-
-    try:
-        # Check if the file descriptor is valid
-        fcntl.fcntl(fd, fcntl.F_GETFD)
-        print("File descriptor is valid.")
-    except OSError as e:
-        print(f"Invalid file descriptor: {e}")
-        return
-
-    try:
-        # Get file descriptor status
-        stat_info = os.fstat(fd)
-        print(f"File descriptor status: {stat_info}")
-    except OSError as e:
-        print(f"Error getting file descriptor status: {e}")
-        return
-
-    # Check if the file descriptor is ready for reading
-    try:
-        readable, _, _ = select.select([fd], [], [], 0)
-        if readable:
-            print("File descriptor is ready for reading.")
-        else:
-            print("File descriptor is not ready for reading.")
-    except Exception as e:
-        print(f"Error checking readability: {e}")
-
-    # Check if the file descriptor is ready for writing
-    try:
-        _, writable, _ = select.select([], [fd], [], 0)
-        if writable:
-            print("File descriptor is ready for writing.")
-        else:
-            print("File descriptor is not ready for writing.")
-    except Exception as e:
-        print(f"Error checking writability: {e}")
-
-
 def test_shared_memory_resource():
     """Test shared memory pool functionality across processes."""
 
@@ -339,8 +296,6 @@ def test_shared_memory_resource():
     print("shareable handle: ", shareable_handle)
     assert shareable_handle != 0
 
-    # Verify handle is a valid file descriptor
-    check_file_descriptor(shareable_handle)
     # try importing on the same process
     imported_pool = SharedMempool(0, shared_handle=shareable_handle)
     print("imported pool: ", imported_pool)
