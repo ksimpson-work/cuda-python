@@ -341,7 +341,9 @@ def test_shared_memory_resource():
 
     # Verify handle is a valid file descriptor
     check_file_descriptor(shareable_handle)
-
+    # try importing on the same process
+    imported_pool = SharedMempool(0, shared_handle=shareable_handle)
+    print("imported pool: ", imported_pool)
     # check if the file descriptor is readable
     try:
         os.read(shareable_handle, 1)
