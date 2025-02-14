@@ -13,10 +13,9 @@ except ImportError:
 
 import ctypes
 import multiprocessing
-import os
 
 from cuda.core.experimental import Device
-from cuda.core.experimental._memory import Buffer, MemoryResource, SharedMempool
+from cuda.core.experimental._memory import Buffer, MemoryResource, ShareableAllocator, SharedMempool
 from cuda.core.experimental._utils import handle_return
 
 
@@ -324,57 +323,79 @@ def test_shared_memory_resource():
             raise exception
 
 
-def pointer_child_process(handle, export_data, queue):
+def child_process_allocator(size, handle, queue):
     try:
-        # Import the pool
-        imported_pool = SharedMempool(0, shared_handle=handle)
+        # Initialize device in child process
+        device = Device()
+        device.set_current()
 
-        # Import the pointer
-        imported_ptr = imported_pool.import_pointer(export_data)
+        # Create allocator and import buffer
+        alloc = ShareableAllocator(device.device_id)
+        imported_buffer = alloc.import_shareable_allocation(size, handle)
 
-        # Verify pointer is valid
-        assert imported_ptr != 0
+        # Verify imported buffer properties
+        assert imported_buffer.handle != 0
+        assert imported_buffer.size == size
+        assert imported_buffer.memory_resource == alloc
+        assert imported_buffer.is_device_accessible
+        assert not imported_buffer.is_host_accessible
+        assert imported_buffer.device_id == device.device_id
 
+        # Clean up
+        imported_buffer.close()
         queue.put(None)  # Signal success
+
     except Exception as e:
         queue.put(e)
 
 
-def test_shared_memory_pointer():
-    # Get device
-    device = Device(0)
+def test_sharable_allocator():
+    print("\nTesting ShareableAllocator...")
 
-    # Create shared memory pool
-    pool_size = 64 * 64
-    mr = SharedMempool(device.device_id, max_size=pool_size)
+    # Initialize device
+    print("Initializing device...")
+    device = Device()
+    device.set_current()
+    print(f"Using device {device.device_id}")
 
-    # Allocate memory and get pointer
-    buffer = mr.allocate(64)
-    ptr = buffer.handle
+    # Create allocator and get sharable allocation
+    print("Creating ShareableAllocator...")
+    alloc = ShareableAllocator(device.device_id)
+    size = 1024
+    print(f"Getting shareable allocation of size {size} bytes...")
+    buffer, handle = alloc.get_shareable_allocation(size)
+    print(f"Got buffer with handle {buffer.handle} and shareable handle {handle}")
 
-    # Export pointer data
-    export_data = mr.export_pointer(ptr)
+    # Verify original buffer properties
+    print("Verifying buffer properties...")
+    assert buffer.handle != 0
+    assert buffer.size == size
+    assert buffer.memory_resource == alloc
+    assert buffer.is_device_accessible
+    assert not buffer.is_host_accessible
+    assert buffer.device_id == device.device_id
+    print("Buffer properties verified successfully")
 
-    # Get shareable handle for pool
-    shareable_handle = mr.get_shareable_handle()
-
-    # Test cross-process pointer sharing
-    multiprocessing.set_start_method("spawn", force=True)
+    # Test cross-process sharing
+    print("Testing cross-process sharing...")
     queue = multiprocessing.Queue()
-
-    # Create child process
-    process = multiprocessing.Process(target=pointer_child_process, args=(os.dup(shareable_handle), export_data, queue))
+    print("Creating child process...")
+    process = multiprocessing.Process(target=child_process_allocator, args=(size, handle, queue))
+    print("Starting child process...")
     process.start()
-
-    # Wait for child process to complete
+    print("Waiting for child process to complete...")
     process.join(timeout=10)
-    assert process.exitcode == 0, "Child process failed"
 
-    # Check for any exceptions from the child process
+    # Check child process results
+    print("Checking child process results...")
+    assert process.exitcode == 0, "Child process failed"
     if not queue.empty():
         exception = queue.get()
         if isinstance(exception, Exception):
             raise exception
+    print("Child process completed successfully")
 
-    # Cleanup
+    # Clean up
+    print("Cleaning up...")
     buffer.close()
+    print("ShareableAllocator tests passed")
