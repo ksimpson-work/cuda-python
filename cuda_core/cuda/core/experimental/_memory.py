@@ -281,7 +281,7 @@ class SharedMempool(MemoryResource):
             properties.location = driver.CUmemLocation()
             properties.location.id = dev_id
             properties.location.type = driver.CUmemLocationType.CU_MEM_LOCATION_TYPE_DEVICE
-            properties.maxSize = 0
+            properties.maxSize = max_size
             properties.win32SecurityAttributes = 0
             properties.usage = 0
 
